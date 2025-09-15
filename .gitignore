@@ -1,0 +1,52 @@
+# Go build and dependency files
+/bin/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.cov
+
+# Dependency directories (remove the comment below if you use Go modules)
+/vendor/
+
+# Go workspace file
+*.code-workspace
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Swagger generated files
+/docs/swagger.json
+/docs/swagger.yaml
+
+# Test cache
+/test/
+
+# Ignore by default
+*.bak
+*.tmp
+
+# Ignore coverage reports
+coverage*
+
+# Ignore assets if generated
+/assets/
