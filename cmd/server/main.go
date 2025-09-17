@@ -1,15 +1,16 @@
 package main
 
 import (
-	docs "go-template/docs"
-	"go-template/internal/db"
-	"go-template/internal/middleware"
-	"go-template/internal/user/handler"
-
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+
+	docs "go-template/docs"
+	"go-template/internal/db"
+	"go-template/internal/middleware"
+	orderhandler "go-template/internal/order/handler"
+	userhandler "go-template/internal/user/handler"
 )
 
 // @title Example API
@@ -36,15 +37,17 @@ func main() {
 	// r.Use(middleware.AuthMiddleware())
 
 	// Public routes
-	r.POST("/login", handler.LoginHandler)
-	r.POST("/register", handler.RegisterUserHandler)
+	// These endpoints are open to everyone (no authentication required)
+	r.POST("/login", userhandler.LoginHandler)
+	r.POST("/register", userhandler.RegisterUserHandler)
 
 	// Protected routes
+	// These endpoints require authentication (JWT or session)
 	authorized := r.Group("/user", middleware.AuthMiddleware())
 	{
-		authorized.GET("/:id", handler.GetUserHandler)
-		authorized.PUT("/:id", handler.UpdateUserHandler)
-		authorized.DELETE("/:id", handler.DeleteUserHandler)
+		authorized.GET("/:id", userhandler.GetUserHandler)
+		authorized.PUT("/:id", userhandler.UpdateUserHandler)
+		authorized.DELETE("/:id", userhandler.DeleteUserHandler)
 	}
 
 	// Swagger setup
@@ -53,6 +56,9 @@ func main() {
 
 	// User API
 	// handler.RegisterUserRoutes(r)
+
+	// Order API
+	orderhandler.RegisterOrderRoutes(r)
 
 	r.Run(":8080")
 }
