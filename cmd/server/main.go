@@ -48,6 +48,7 @@ func main() {
 		authorized.GET("/:id", userhandler.GetUserHandler)
 		authorized.PUT("/:id", userhandler.UpdateUserHandler)
 		authorized.DELETE("/:id", userhandler.DeleteUserHandler)
+		authorized.GET("/:id/orders", userhandler.GetUserWithOrdersHandler)
 	}
 
 	// Swagger setup

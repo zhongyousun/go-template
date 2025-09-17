@@ -131,3 +131,64 @@ Always let handlers call service methods, and let services call repository metho
 
 For additional notes or examples, please update this document.
 
+---
+
+## Cross-Service/Repository Calls: Best Practices
+
+In some business scenarios, a service may need to aggregate or orchestrate data from multiple domains (e.g., the user service needs to fetch both user info and their orders). This project demonstrates how to achieve this cleanly:
+
+- **Inject Multiple Repositories into a Service:**
+  - The service struct (e.g., `UserService`) can accept multiple repository interfaces (e.g., `UserRepository`, `OrderRepository`) via its constructor.
+  - This allows the service to coordinate data from different sources while keeping each repository focused on a single domain.
+
+- **Example: UserService Fetching User and Orders**
+
+```go
+// In service/user_service.go
+type UserService struct {
+    Repo      repository.UserRepository
+    OrderRepo orderrepo.OrderRepository
+}
+
+func NewUserService(repo repository.UserRepository, orderRepo orderrepo.OrderRepository) *UserService {
+    return &UserService{Repo: repo, OrderRepo: orderRepo}
+}
+
+// UserWithOrders DTO
+type UserWithOrders struct {
+    User   *model.User           `json:"user"`
+    Orders []*ordermodel.Order   `json:"orders"`
+}
+
+func (s *UserService) GetUserWithOrders(userID int64) (*UserWithOrders, error) {
+    user, err := s.Repo.GetUserByID(userID)
+    if err != nil || user == nil {
+        return nil, err
+    }
+    orders, err := s.OrderRepo.GetOrdersByUserID(userID)
+    if err != nil {
+        return nil, err
+    }
+    return &UserWithOrders{User: user, Orders: orders}, nil
+}
+```
+
+- **Handler Layer Usage:**
+
+```go
+db := c.MustGet("db").(*sql.DB)
+userRepo := repository.NewUserRepository(db)
+orderRepo := orderrepo.NewOrderRepository(db)
+userService := service.NewUserService(userRepo, orderRepo)
+result, err := userService.GetUserWithOrders(id)
+```
+
+### Why This Pattern?
+- Keeps each repository focused on a single domain.
+- Allows services to aggregate and orchestrate data/business logic as needed.
+- Maintains testability and separation of concerns.
+- Makes it easy to extend or swap out dependencies.
+
+**Tip:**
+If a DTO (like `UserWithOrders`) is used by multiple layers, consider placing it in the `model` package for clarity and reusability.
+

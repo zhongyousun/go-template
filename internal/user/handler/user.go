@@ -1,12 +1,13 @@
+// ...existing code...
 package handler
 
 import (
 	"database/sql"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
+	orderrepo "go-template/internal/order/repository"
 	"go-template/internal/user/model"
 	"go-template/internal/user/repository"
 	"go-template/internal/user/service"
@@ -15,8 +16,6 @@ import (
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 // GetUserHandler godoc
 // @Summary Get user info
@@ -29,7 +28,8 @@ var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 func GetUserHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
 	repo := repository.NewUserRepository(db)
-	userService := service.NewUserService(repo)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -71,7 +71,8 @@ func CreateUserHandler(c *gin.Context) {
 	}
 	db := c.MustGet("db").(*sql.DB)
 	repo := repository.NewUserRepository(db)
-	userService := service.NewUserService(repo)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
 	err := userService.RegisterUser(&user)
 	if err != nil {
 		log.Printf("Create failed: %v", err)
@@ -95,7 +96,8 @@ func CreateUserHandler(c *gin.Context) {
 func UpdateUserHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
 	repo := repository.NewUserRepository(db)
-	userService := service.NewUserService(repo)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -131,7 +133,8 @@ func UpdateUserHandler(c *gin.Context) {
 func DeleteUserHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
 	repo := repository.NewUserRepository(db)
-	userService := service.NewUserService(repo)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
@@ -227,8 +230,10 @@ func LoginHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
 	// Initialize user repository
 	repo := repository.NewUserRepository(db)
+	// Initialize order repository
+	orderRepo := orderrepo.NewOrderRepository(db)
 	// Initialize user service
-	userService := service.NewUserService(repo)
+	userService := service.NewUserService(repo, orderRepo)
 
 	// Authenticate user and generate JWT token
 	token, err := userService.LoginUser(creds.Email, creds.Password)
@@ -239,4 +244,43 @@ func LoginHandler(c *gin.Context) {
 	}
 	// Return JWT token in response
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+// GetUserWithOrdersHandler godoc
+// @Summary Get user info with orders
+// @Description Get user data and all orders by user ID
+// @Tags user
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} model.UserWithOrders
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /user/{id}/orders [get]
+func GetUserWithOrdersHandler(c *gin.Context) {
+	db := c.MustGet("db").(*sql.DB)
+	repo := repository.NewUserRepository(db)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		return
+	}
+	jwtRole, _ := c.Get("role")
+	if jwtRole != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
+		return
+	}
+	result, err := userService.GetUserWithOrders(id)
+	if err != nil {
+		log.Printf("Query failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+	if result == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, result)
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	orderrepo "go-template/internal/order/repository"
 	"go-template/internal/user/model"
 	"go-template/internal/user/repository"
 
@@ -14,12 +15,33 @@ import (
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
+// UserService is responsible for user-related operations
 type UserService struct {
-	Repo repository.UserRepository // 注意這裡依賴的是 interface
+	Repo      repository.UserRepository
+	OrderRepo orderrepo.OrderRepository
 }
 
-func NewUserService(repo repository.UserRepository) *UserService {
-	return &UserService{Repo: repo}
+func NewUserService(repo repository.UserRepository, orderRepo orderrepo.OrderRepository) *UserService {
+	return &UserService{Repo: repo, OrderRepo: orderRepo}
+}
+
+// GetUserWithOrders returns user and their orders by userID
+func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, error) {
+	user, err := s.Repo.GetUserByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user failed: %w", err)
+	}
+	if user == nil {
+		return nil, nil
+	}
+	orders, err := s.OrderRepo.GetOrdersByUserID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("get orders failed: %w", err)
+	}
+	return &model.UserWithOrders{
+		User:   user,
+		Orders: orders,
+	}, nil
 }
 
 func (s *UserService) RegisterUser(user *model.User) error {

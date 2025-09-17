@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"go-template/internal/order/model"
+	"time"
+)
 
 type User struct {
 	ID        int       `json:"id"`
@@ -9,4 +12,9 @@ type User struct {
 	Password  string    `json:"password"`
 	CreatedAt time.Time `json:"createdAt"`
 	Role      string    `json:"role"`
+}
+
+type UserWithOrders struct {
+	User   *User          `json:"user"`
+	Orders []*model.Order `json:"orders"`
 }
