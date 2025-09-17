@@ -1,3 +1,10 @@
+
+## Table of Contents
+- [Folder Purpose](#folder-purpose)
+- [JWT Authentication & Role-Based API Protection](#jwt-authentication--role-based-api-protection)
+- [Service vs Repository Layer: Usage and Best Practices](#service-vs-repository-layer-usage-and-best-practices)
+
+
 # Go Template Project Structure
 
 ```
@@ -67,4 +74,60 @@ See the above files for implementation details and reference code.
 
 ---
 
+## Service vs Repository Layer: Usage and Best Practices
+
+This project follows a clean separation between the **service** and **repository** layers:
+
+- **Repository Layer** (`internal/user/repository/`):
+    - Responsible for direct data access (e.g., SQL queries, CRUD operations).
+    - Exposes interfaces (e.g., `UserRepository`) and concrete implementations (e.g., `userRepository`).
+    - Should not contain business logic—only data persistence and retrieval.
+
+- **Service Layer** (`internal/user/service/`):
+    - Responsible for business logic, validation, and orchestration.
+    - Depends on repository interfaces, not concrete implementations (for testability and flexibility).
+    - Handles tasks like password hashing, authentication, and combining multiple repository calls.
+    - Exposes methods for handlers to use (e.g., `RegisterUser`, `LoginUser`, `GetUserByID`).
+
+### Example Usage
+
+**Handler Layer:**
+
+```go
+// In handler
+db := c.MustGet("db").(*sql.DB)
+repo := repository.NewUserRepository(db)
+userService := service.NewUserService(repo)
+user, err := userService.GetUserByID(id)
+```
+
+**Service Layer:**
+
+```go
+// In service
+func (s *UserService) GetUserByID(id int64) (*model.User, error) {
+        return s.Repo.GetUserByID(id)
+}
+```
+
+**Repository Layer:**
+
+```go
+// In repository
+func (r *userRepository) GetUserByID(id int64) (*model.User, error) {
+        // SQL query to fetch user by ID
+}
+```
+
+### Why This Separation?
+
+- Keeps business logic out of data access code.
+- Makes unit testing easier (service can be tested with mock repositories).
+- Allows swapping data sources (e.g., switch from SQL to NoSQL) with minimal changes.
+- Improves code readability and maintainability.
+
+**Tip:**
+Always let handlers call service methods, and let services call repository methods. Avoid letting handlers call repository methods directly.
+
 For additional notes or examples, please update this document.
+

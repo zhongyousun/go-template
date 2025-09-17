@@ -1,28 +1,20 @@
 package handler
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"time"
+
+	"go-template/internal/user/model"
+	"go-template/internal/user/repository"
+	"go-template/internal/user/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
-
-type User struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Password  string    `json:"password"`
-	CreatedAt time.Time `json:"createdAt"`
-	Role      string    `json:"role"`
-}
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
@@ -32,30 +24,26 @@ var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 // @Tags user
 // @Security BearerAuth
 // @Param id path int true "User ID"
-// @Success 200 {object} User
+// @Success 200 {object} model.User
 // @Router /user/{id} [get]
 func GetUserHandler(c *gin.Context) {
-	// Get db from context
 	db := c.MustGet("db").(*sql.DB)
-
-	id := c.Param("id")
-
-	// Get JWT payload from Gin Context
+	repo := repository.NewUserRepository(db)
+	userService := service.NewUserService(repo)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		return
+	}
 	jwtRole, _ := c.Get("role")
 	if jwtRole != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(c, 3*time.Second) // 3 seconds timeout
-	defer cancel()
-	var user User
-	err := db.QueryRowContext(ctx, `
-		SELECT "id", "name", "email", "password", "createdAt", "role"
-		FROM "user" 
-		WHERE "id" = $1
-	`, id).Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.CreatedAt, &user.Role)
 
-	if err == sql.ErrNoRows {
+	user, err := userService.GetUserByID(id)
+	if err == sql.ErrNoRows || user == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	} else if err != nil {
@@ -63,7 +51,6 @@ func GetUserHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
-
 	c.JSON(http.StatusOK, user)
 }
 
@@ -73,21 +60,19 @@ func GetUserHandler(c *gin.Context) {
 // @Tags user
 // @Accept json
 // @Produce json
-// @Param user body User true "User Info"
+// @Param user body model.User true "User Info"
 // @Success 201 {object} map[string]interface{}
 // @Router /user [post]
 func CreateUserHandler(c *gin.Context) {
-	var user User
+	var user model.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	db := c.MustGet("db").(*sql.DB)
-	err := db.QueryRow(`
-		INSERT INTO "user" ("name", "email", "password", "role")
-		VALUES ($1, $2, $3, $4)
-		RETURNING "id", "createdAt"
-	`, user.Name, user.Email, user.Password, user.Role).Scan(&user.ID, &user.CreatedAt)
+	repo := repository.NewUserRepository(db)
+	userService := service.NewUserService(repo)
+	err := userService.RegisterUser(&user)
 	if err != nil {
 		log.Printf("Create failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Create failed"})
@@ -104,31 +89,34 @@ func CreateUserHandler(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "User ID"
-// @Param user body User true "User Info"
-// @Success 200 {object} User
+// @Param user body model.User true "User Info"
+// @Success 200 {object} model.User
 // @Router /user/{id} [put]
 func UpdateUserHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
-	id := c.Param("id")
-	var user User
+	repo := repository.NewUserRepository(db)
+	userService := service.NewUserService(repo)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		return
+	}
+	var user model.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	res, err := db.Exec(`
-		UPDATE "user" SET "name"=$1, "email"=$2, "password"=$3, "role"=$4 WHERE "id"=$5
-	`, user.Name, user.Email, user.Password, user.Role, id)
-	if err != nil {
+	user.ID = int(id)
+	err = userService.UpdateUser(&user)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	} else if err != nil {
 		log.Printf("Update failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
 		return
 	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-	user.ID, _ = strconv.Atoi(id)
 	c.JSON(http.StatusOK, user)
 }
 
@@ -142,16 +130,21 @@ func UpdateUserHandler(c *gin.Context) {
 // @Router /user/{id} [delete]
 func DeleteUserHandler(c *gin.Context) {
 	db := c.MustGet("db").(*sql.DB)
-	id := c.Param("id")
-	res, err := db.Exec(`DELETE FROM "user" WHERE "id"=$1`, id)
+	repo := repository.NewUserRepository(db)
+	userService := service.NewUserService(repo)
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		log.Printf("Delete failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Delete failed"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
 		return
 	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
+	err = userService.DeleteUser(id)
+	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	} else if err != nil {
+		log.Printf("Delete failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Delete failed"})
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -163,13 +156,13 @@ func DeleteUserHandler(c *gin.Context) {
 // @Tags user
 // @Accept json
 // @Produce json
-// @Param user body User true "User Info"
-// @Success 201 {object} User
+// @Param user body model.User true "User Info"
+// @Success 201 {object} model.User
 // @Failure 400 {object} map[string]string
 // @Failure 500 {object} map[string]string
 // @Router /register [post]
 func RegisterUserHandler(c *gin.Context) {
-	var user User
+	var user model.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
@@ -217,39 +210,33 @@ type LoginRequest struct {
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Router /login [post]
+// LoginHandler handles user login requests
+// 1. Parse login credentials from JSON body
+// 2. Initialize repository and service layers
+// 3. Authenticate user and generate JWT token
+// 4. Return token or error response
 func LoginHandler(c *gin.Context) {
+	// Parse login credentials from request body
 	var creds LoginRequest
 	if err := c.ShouldBindJSON(&creds); err != nil {
+		// If parsing fails, return 400 Bad Request
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
+	// Get database connection from Gin context
 	db := c.MustGet("db").(*sql.DB)
-	var user User
-	err := db.QueryRow(`SELECT "id", "name", "email", "password", "role" FROM "user" WHERE "email"=$1`, creds.Email).Scan(&user.ID, &user.Name, &user.Email, &user.Password, &user.Role)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
-		return
-	} else if err != nil {
-		log.Printf("Login query failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password)) != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
-		return
-	}
-	// Generate JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
-		"role":  user.Role,
-		"exp":   time.Now().Add(time.Hour * 72).Unix(),
-	})
-	tokenString, err := token.SignedString(jwtSecret)
+	// Initialize user repository
+	repo := repository.NewUserRepository(db)
+	// Initialize user service
+	userService := service.NewUserService(repo)
+
+	// Authenticate user and generate JWT token
+	token, err := userService.LoginUser(creds.Email, creds.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		// If authentication fails, return 401 Unauthorized
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	// Return JWT token in response
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }

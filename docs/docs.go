@@ -90,7 +90,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 ],
@@ -98,7 +98,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     },
                     "400": {
@@ -142,7 +142,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 ],
@@ -182,7 +182,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 }
@@ -218,7 +218,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 ],
@@ -226,7 +226,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handler.User"
+                            "$ref": "#/definitions/model.User"
                         }
                     }
                 }
@@ -276,7 +276,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handler.User": {
+        "model.User": {
             "type": "object",
             "properties": {
                 "createdAt": {
