@@ -2,29 +2,29 @@ package repository
 
 import (
 	"database/sql"
-	"go-template/internal/user/model"
+	user "go-template/internal/user/model"
 )
 
-// UserRepository 定義 contract
+// UserRepository defines the contract for user data access
 type UserRepository interface {
-	CreateUser(user *model.User) error
-	GetUserByEmail(email string) (*model.User, error)
-	GetUserByID(id int64) (*model.User, error)
-	UpdateUser(user *model.User) error
+	CreateUser(user *user.User) error
+	GetUserByEmail(email string) (*user.User, error)
+	GetUserByID(id int64) (*user.User, error)
+	UpdateUser(user *user.User) error
 	DeleteUser(id int64) error
 }
 
-// userRepository 是實作，持有 *sql.DB
+// userRepository is the implementation, holding *sql.DB
 type userRepository struct {
 	DB *sql.DB
 }
 
-// NewUserRepository 建立新的 UserRepository 實例
+// NewUserRepository creates a new UserRepository instance
 func NewUserRepository(db *sql.DB) UserRepository {
 	return &userRepository{DB: db}
 }
 
-func (r *userRepository) CreateUser(user *model.User) error {
+func (r *userRepository) CreateUser(user *user.User) error {
 	err := r.DB.QueryRow(
 		`INSERT INTO "user" ("name", "email", "password", "role")
 		VALUES ($1, $2, $3, $4)
@@ -37,8 +37,8 @@ func (r *userRepository) CreateUser(user *model.User) error {
 	return nil
 }
 
-func (r *userRepository) GetUserByID(id int64) (*model.User, error) {
-	var user model.User
+func (r *userRepository) GetUserByID(id int64) (*user.User, error) {
+	var user user.User
 	err := r.DB.QueryRow(
 		`SELECT "id", "name", "email", "password", "createdAt", "role" 
 		FROM "user" WHERE "id" = $1`,
@@ -52,8 +52,8 @@ func (r *userRepository) GetUserByID(id int64) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *userRepository) GetUserByEmail(email string) (*model.User, error) {
-	var user model.User
+func (r *userRepository) GetUserByEmail(email string) (*user.User, error) {
+	var user user.User
 	err := r.DB.QueryRow(
 		`SELECT "id", "name", "email", "password", "role"
           FROM "user"
@@ -69,7 +69,7 @@ func (r *userRepository) GetUserByEmail(email string) (*model.User, error) {
 	return &user, nil
 }
 
-func (r *userRepository) UpdateUser(user *model.User) error {
+func (r *userRepository) UpdateUser(user *user.User) error {
 	res, err := r.DB.Exec(
 		`UPDATE "user" SET "name"=$1, "email"=$2, "password"=$3, "role"=$4 WHERE "id"=$5`,
 		user.Name, user.Email, user.Password, user.Role, user.ID,

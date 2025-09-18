@@ -27,11 +27,11 @@ func NewUserService(repo repository.UserRepository, orderRepo orderrepo.OrderRep
 
 // GetUserWithOrders returns user and their orders by userID
 func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, error) {
-	user, err := s.Repo.GetUserByID(userID)
+	usr, err := s.Repo.GetUserByID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user failed: %w", err)
 	}
-	if user == nil {
+	if usr == nil {
 		return nil, nil
 	}
 	orders, err := s.OrderRepo.GetOrdersByUserID(userID)
@@ -39,7 +39,7 @@ func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, er
 		return nil, fmt.Errorf("get orders failed: %w", err)
 	}
 	return &model.UserWithOrders{
-		User:   user,
+		User:   usr,
 		Orders: orders,
 	}, nil
 }
