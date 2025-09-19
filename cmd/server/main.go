@@ -11,6 +11,7 @@ import (
 	"go-template/internal/middleware"
 	orderhandler "go-template/internal/order/handler"
 	userhandler "go-template/internal/user/handler"
+	"go-template/pkg/redisclient"
 )
 
 // @title Example API
@@ -36,10 +37,14 @@ func main() {
 	})
 	// r.Use(middleware.AuthMiddleware())
 
+	// Init Redis
+	redisclient.Init()
+
 	// Public routes
 	// These endpoints are open to everyone (no authentication required)
 	r.POST("/login", userhandler.LoginHandler)
 	r.POST("/register", userhandler.RegisterUserHandler)
+	r.GET("/userwithcache/:id", userhandler.GetUserWithCacheHandler)
 
 	// Protected routes
 	// These endpoints require authentication (JWT or session)

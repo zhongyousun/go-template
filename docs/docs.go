@@ -317,6 +317,56 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/userwithcache/{id}": {
+            "get": {
+                "description": "Retrieve a user by ID. Uses Redis cache if available; falls back to DB otherwise.",
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get user by ID with Redis caching",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {

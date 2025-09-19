@@ -24,6 +24,13 @@ type UserService struct {
 func NewUserService(repo repository.UserRepository, orderRepo orderrepo.OrderRepository) *UserService {
 	return &UserService{Repo: repo, OrderRepo: orderRepo}
 }
+func (s *UserService) GetUserByID(id int64) (*model.User, error) {
+	return s.Repo.GetUserByID(id)
+}
+
+func (s *UserService) GetUserByIDWithCache(id int64) (*model.User, error) {
+	return s.Repo.GetUserByIDWithCache(id)
+}
 
 // GetUserWithOrders returns user and their orders by userID
 func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, error) {
@@ -85,8 +92,4 @@ func (s *UserService) UpdateUser(user *model.User) error {
 
 func (s *UserService) DeleteUser(id int64) error {
 	return s.Repo.DeleteUser(id)
-}
-
-func (s *UserService) GetUserByID(id int64) (*model.User, error) {
-	return s.Repo.GetUserByID(id)
 }

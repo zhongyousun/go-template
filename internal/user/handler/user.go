@@ -321,7 +321,6 @@ func LoginHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
-// ...existing code...
 // GetUserWithOrdersHandler godoc
 // @Summary Get user info with orders
 // @Description Get user data and all orders by user ID
@@ -357,6 +356,58 @@ func GetUserWithOrdersHandler(c *gin.Context) {
 		return
 	}
 	result, err := userService.GetUserWithOrders(id)
+	if err != nil {
+		log.Printf("Query failed: %v", err)
+		c.JSON(http.StatusInternalServerError, commonmodel.ErrorResponse{
+			Error:   "Internal server error",
+			Code:    http.StatusInternalServerError,
+			Details: err.Error(),
+		})
+		return
+	}
+	if result == nil {
+		c.JSON(http.StatusNotFound, commonmodel.ErrorResponse{
+			Error:   "User not found",
+			Code:    http.StatusNotFound,
+			Details: "No user found with the given ID",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GetUserWithCacheHandler godoc
+// @Summary Get user by ID with Redis caching
+// @Description Retrieve a user by ID. Uses Redis cache if available; falls back to DB otherwise.
+// @Tags user
+// @Param id path int true "User ID"
+// @Success 200 {object} model.User
+// @Failure 400 {object} commonmodel.ErrorResponse
+// @Failure 403 {object} commonmodel.ErrorResponse
+// @Failure 404 {object} commonmodel.ErrorResponse
+// @Failure 500 {object} commonmodel.ErrorResponse
+// @Router /userwithcache/{id} [get]
+func GetUserWithCacheHandler(c *gin.Context) {
+	// Init repositories & services
+	db := c.MustGet("db").(*sql.DB)
+	repo := repository.NewUserRepository(db)
+	orderRepo := orderrepo.NewOrderRepository(db)
+	userService := service.NewUserService(repo, orderRepo)
+
+	// Parse user ID
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, commonmodel.ErrorResponse{
+			Error:   "Invalid user id",
+			Code:    http.StatusBadRequest,
+			Details: "User ID must be a valid integer",
+		})
+		return
+	}
+
+	// Query user with cache support
+	result, err := userService.GetUserByIDWithCache(id)
 	if err != nil {
 		log.Printf("Query failed: %v", err)
 		c.JSON(http.StatusInternalServerError, commonmodel.ErrorResponse{
