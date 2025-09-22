@@ -13,8 +13,8 @@ import (
 	"go-template/internal/user/service"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // GetUserHandler godoc
@@ -26,7 +26,7 @@ import (
 // @Success 200 {object} model.User
 // @Router /user/{id} [get]
 func GetUserHandler(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)

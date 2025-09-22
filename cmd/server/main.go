@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
@@ -12,6 +14,9 @@ import (
 	orderhandler "go-template/internal/order/handler"
 	userhandler "go-template/internal/user/handler"
 	"go-template/pkg/redisclient"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 // @title Example API
@@ -25,29 +30,39 @@ import (
 func main() {
 	// Load environment variables
 	godotenv.Load()
-	// Initialize DB
+
+	// Example: Initialize sql.DB (legacy/original version)
+	// You can use this if you want to use the standard library database/sql API instead of GORM.
+	// By default, this project uses GORM for database operations, but you can switch to sql.DB if needed.
 	db.InitDB()
 	defer db.DB.Close()
 
+	// Example: Initialize GORM DB (recommended/primary usage)
+	// This is the main database connection for most use cases in this project.
+	// If you want to use GORM's ORM features, use this connection.
+	gormDSN := os.Getenv("POSTGRES_CONN")
+	gormDB, err := gorm.Open(postgres.Open(gormDSN), &gorm.Config{})
+	if err != nil {
+		panic("failed to connect to database (gorm): " + err.Error())
+	}
+
 	r := gin.Default()
-	// Middleware: Inject DB into Gin Context
+	// Middleware: Inject both DB into Gin Context
 	r.Use(func(c *gin.Context) {
 		c.Set("db", db.DB)
+		c.Set("gorm", gormDB)
 		c.Next()
 	})
-	// r.Use(middleware.AuthMiddleware())
 
 	// Init Redis
 	redisclient.Init()
 
 	// Public routes
-	// These endpoints are open to everyone (no authentication required)
 	r.POST("/login", userhandler.LoginHandler)
 	r.POST("/register", userhandler.RegisterUserHandler)
 	r.GET("/userwithcache/:id", userhandler.GetUserWithCacheHandler)
 
 	// Protected routes
-	// These endpoints require authentication (JWT or session)
 	authorized := r.Group("/user", middleware.AuthMiddleware())
 	{
 		authorized.GET("/:id", userhandler.GetUserHandler)
@@ -59,9 +74,6 @@ func main() {
 	// Swagger setup
 	docs.SwaggerInfo.BasePath = "/"
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// User API
-	// handler.RegisterUserRoutes(r)
 
 	// Order API
 	orderhandler.RegisterOrderRoutes(r)
