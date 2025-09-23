@@ -18,6 +18,7 @@ This template provides a modern, scalable foundation for Go web projects, featur
   - Code: `internal/user/handler/user.go` (`RegisterUserWithOrderHandler`), `internal/user/service/user_service.go` (`RegisterUserWithOrder`), `internal/db/transaction_manager.go`, `internal/user/repository/user_repository.go`, `internal/order/repository/order_repository.go`
 - **Redis Caching**: Fast user lookup with Redis, seamlessly falling back to the database if needed.
   - Code: `pkg/redisclient/redis.go`, `internal/user/repository/user_repository.go` (`GetUserByIDWithCache`)
+  - The Redis client is designed to automatically reconnect if the connection is lost, ensuring that temporary Redis outages do not affect overall system stability (the system will fallback to DB as needed).
 - **API Documentation**: Auto-generated Swagger docs for easy API exploration and testing.
   - Usage: Start the server and open [Swagger UI](http://localhost:8080/swagger/index.html) to explore and test the API
   - To update API docs after code changes:
@@ -65,6 +66,21 @@ assets/
 
 
 To get started with this template:
+
+> **Environment Setup Reminder**
+>
+> This project connects to a PostgreSQL database and requires the following environment variables to be set in your `.env` file:
+>
+> ```env
+> POSTGRES_CONN=your_postgres_connection_string
+> JWT_SECRET=your_jwt_secret
+> REDIS_HOST=127.0.0.1
+> REDIS_PORT=6379
+> REDIS_PASSWORD=your_redis_password
+> ```
+>
+> - Make sure PostgreSQL and Redis are running and accessible.
+> - Update the values above to match your local or production environment.
 
 1. **Install Go dependencies**
   ```
