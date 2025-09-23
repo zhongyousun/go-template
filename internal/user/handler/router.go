@@ -10,4 +10,5 @@ func RegisterUserRoutes(r *gin.Engine) {
 	r.POST("/register", RegisterUserHandler)
 	r.POST("/login", LoginHandler)
 	r.GET("/user/:id/orders", GetUserWithOrdersHandler)
+
 }

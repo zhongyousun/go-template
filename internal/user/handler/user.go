@@ -5,10 +5,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"go-template/internal/common/commonmodel"
+	"go-template/internal/db"
+	orderModel "go-template/internal/order/model"
 	orderrepo "go-template/internal/order/repository"
-	usermodel "go-template/internal/user/model"
+	userModel "go-template/internal/user/model"
 	"go-template/internal/user/repository"
 	"go-template/internal/user/service"
 
@@ -79,7 +82,7 @@ func GetUserHandler(c *gin.Context) {
 // @Success 201 {object} map[string]interface{}
 // @Router /user [post]
 func CreateUserHandler(c *gin.Context) {
-	var user usermodel.User
+	var user userModel.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, commonmodel.ErrorResponse{
 			Error:   "Invalid input",
@@ -88,7 +91,7 @@ func CreateUserHandler(c *gin.Context) {
 		})
 		return
 	}
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)
@@ -117,7 +120,7 @@ func CreateUserHandler(c *gin.Context) {
 // @Success 200 {object} model.User
 // @Router /user/{id} [put]
 func UpdateUserHandler(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)
@@ -131,7 +134,7 @@ func UpdateUserHandler(c *gin.Context) {
 		})
 		return
 	}
-	var user usermodel.User
+	var user userModel.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, commonmodel.ErrorResponse{
 			Error:   "Invalid input",
@@ -170,7 +173,7 @@ func UpdateUserHandler(c *gin.Context) {
 // @Success 204 {string} string ""
 // @Router /user/{id} [delete]
 func DeleteUserHandler(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)
@@ -216,7 +219,7 @@ func DeleteUserHandler(c *gin.Context) {
 // @Failure 500 {object} commonmodel.ErrorResponse
 // @Router /register [post]
 func RegisterUserHandler(c *gin.Context) {
-	var user usermodel.User
+	var user userModel.User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, commonmodel.ErrorResponse{
 			Error:   "Invalid input",
@@ -298,7 +301,7 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 	// Get database connection from Gin context
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	// Initialize user repository
 	repo := repository.NewUserRepository(db)
 	// Initialize order repository
@@ -332,7 +335,7 @@ func LoginHandler(c *gin.Context) {
 // @Failure 404 {object} commonmodel.ErrorResponse
 // @Router /user/{id}/orders [get]
 func GetUserWithOrdersHandler(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)
@@ -389,7 +392,7 @@ func GetUserWithOrdersHandler(c *gin.Context) {
 // @Router /userwithcache/{id} [get]
 func GetUserWithCacheHandler(c *gin.Context) {
 	// Init repositories & services
-	db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewUserRepository(db)
 	orderRepo := orderrepo.NewOrderRepository(db)
 	userService := service.NewUserService(repo, orderRepo)
@@ -426,4 +429,94 @@ func GetUserWithCacheHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+// RegisterUserWithOrderRequest represents the request body for registering a user and creating an order
+// swagger:model RegisterUserWithOrderRequest
+type RegisterUserWithOrderRequest struct {
+	// User info
+	User RegisterUserWithOrderUser `json:"user"`
+	// Order info
+	Order RegisterUserWithOrderOrder `json:"order"`
+}
+
+// RegisterUserWithOrderUser represents user info for registration
+type RegisterUserWithOrderUser struct {
+	// User name
+	// example: testuser
+	Name string `json:"name"`
+	// User email
+	// example: test@example.com
+	Email string `json:"email"`
+	// User password
+	// example: 123456
+	Password string `json:"password"`
+}
+
+// RegisterUserWithOrderOrder represents order info for registration
+type RegisterUserWithOrderOrder struct {
+	// Product
+	// example: "Laptop"
+	Product string `json:"product"`
+	// Price
+	// example: 100
+	Price int `json:"price"`
+}
+
+// RegisterUserWithOrderHandler godoc
+// @Summary Register a new user and create an order (transactional)
+// @Description Register a new user and create an order in a single transaction
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body RegisterUserWithOrderRequest true "User and Order Info"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} commonmodel.ErrorResponse
+// @Failure 500 {object} commonmodel.ErrorResponse
+// @Router /register_with_order [post]
+func RegisterUserWithOrderHandler(c *gin.Context) {
+	var req RegisterUserWithOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, commonmodel.ErrorResponse{
+			Error:   "Invalid input",
+			Code:    http.StatusBadRequest,
+			Details: err.Error(),
+		})
+		return
+	}
+	// Get gorm.DB from context
+	gormDB := c.MustGet("gorm").(*gorm.DB)
+
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(gormDB)
+	orderRepo := orderrepo.NewOrderRepository(gormDB)
+
+	// Initialize TransactionManager (use package db, avoid variable name conflict)
+	txManager := db.NewTransactionManager(gormDB)
+
+	// Create Service (make sure the constructor is defined)
+	userService := service.NewUserServiceWithTx(userRepo, orderRepo, txManager)
+	// Convert request user to internal user model
+	user := &userModel.User{
+		Name:      req.User.Name,
+		Email:     req.User.Email,
+		Password:  req.User.Password,
+		Role:      "user",
+		CreatedAt: time.Now(),
+	}
+	order := &orderModel.Order{
+		Product:   req.Order.Product,
+		Price:     float64(req.Order.Price),
+		CreatedAt: time.Now(),
+	}
+	err := userService.RegisterUserWithOrder(user, order)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, commonmodel.ErrorResponse{
+			Error:   "Register with order failed",
+			Code:    http.StatusInternalServerError,
+			Details: err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"user": user, "order": req.Order})
 }

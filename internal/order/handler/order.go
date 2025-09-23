@@ -9,6 +9,7 @@ import (
 	"go-template/internal/order/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // GetOrderHandler godoc
@@ -19,7 +20,8 @@ import (
 // @Success 200 {object} model.Order
 // @Router /order/{id} [get]
 func GetOrderHandler(c *gin.Context) {
-	db := c.MustGet("db").(*sql.DB)
+	// db := c.MustGet("db").(*sql.DB)
+	db := c.MustGet("gorm").(*gorm.DB)
 	repo := repository.NewOrderRepository(db)
 	orderService := service.NewOrderService(repo)
 	idStr := c.Param("id")

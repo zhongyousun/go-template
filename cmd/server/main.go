@@ -61,6 +61,7 @@ func main() {
 	r.POST("/login", userhandler.LoginHandler)
 	r.POST("/register", userhandler.RegisterUserHandler)
 	r.GET("/userwithcache/:id", userhandler.GetUserWithCacheHandler)
+	r.POST("/register_with_order", userhandler.RegisterUserWithOrderHandler)
 
 	// Protected routes
 	authorized := r.Group("/user", middleware.AuthMiddleware())

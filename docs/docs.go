@@ -136,6 +136,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/register_with_order": {
+            "post": {
+                "description": "Register a new user and create an order in a single transaction",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Register a new user and create an order (transactional)",
+                "parameters": [
+                    {
+                        "description": "User and Order Info",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterUserWithOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/commonmodel.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/user": {
             "post": {
                 "description": "Add a new user",
@@ -400,6 +447,57 @@ const docTemplate = `{
                 }
             }
         },
+        "handler.RegisterUserWithOrderOrder": {
+            "type": "object",
+            "properties": {
+                "price": {
+                    "description": "Price\nexample: 100",
+                    "type": "integer"
+                },
+                "product": {
+                    "description": "Product\nexample: \"Laptop\"",
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RegisterUserWithOrderRequest": {
+            "type": "object",
+            "properties": {
+                "order": {
+                    "description": "Order info",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/handler.RegisterUserWithOrderOrder"
+                        }
+                    ]
+                },
+                "user": {
+                    "description": "User info",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/handler.RegisterUserWithOrderUser"
+                        }
+                    ]
+                }
+            }
+        },
+        "handler.RegisterUserWithOrderUser": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "description": "User email\nexample: test@example.com",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "User name\nexample: testuser",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "User password\nexample: 123456",
+                    "type": "string"
+                }
+            }
+        },
         "model.Order": {
             "type": "object",
             "properties": {
@@ -413,6 +511,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "items": {
+                    "description": "Items is a slice of order items, ignored by GORM (not stored in DB)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/model.OrderItem"

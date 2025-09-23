@@ -16,3 +16,7 @@ func NewOrderService(repo repository.OrderRepository) *OrderService {
 func (s *OrderService) GetOrderByID(id int64) (*model.Order, error) {
 	return s.Repo.GetOrderByID(id)
 }
+
+func (s *OrderService) CreateOrder(order *model.Order) error {
+	return s.Repo.CreateOrder(order)
+}

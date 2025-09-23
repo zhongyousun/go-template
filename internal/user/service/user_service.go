@@ -5,9 +5,11 @@ import (
 	"os"
 	"time"
 
+	"go-template/internal/db"
+	orderModel "go-template/internal/order/model"
 	orderrepo "go-template/internal/order/repository"
-	"go-template/internal/user/model"
-	"go-template/internal/user/repository"
+	userModel "go-template/internal/user/model"
+	userrepo "go-template/internal/user/repository"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -17,23 +19,33 @@ var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
 
 // UserService is responsible for user-related operations
 type UserService struct {
-	Repo      repository.UserRepository
+	Repo      userrepo.UserRepository
 	OrderRepo orderrepo.OrderRepository
+	txManager db.TransactionManager
 }
 
-func NewUserService(repo repository.UserRepository, orderRepo orderrepo.OrderRepository) *UserService {
+func NewUserService(repo userrepo.UserRepository, orderRepo orderrepo.OrderRepository) *UserService {
 	return &UserService{Repo: repo, OrderRepo: orderRepo}
 }
-func (s *UserService) GetUserByID(id int64) (*model.User, error) {
+
+func NewUserServiceWithTx(repo userrepo.UserRepository, orderRepo orderrepo.OrderRepository, txManager db.TransactionManager) *UserService {
+	return &UserService{
+		Repo:      repo,
+		OrderRepo: orderRepo,
+		txManager: txManager,
+	}
+}
+
+func (s *UserService) GetUserByID(id int64) (*userModel.User, error) {
 	return s.Repo.GetUserByID(id)
 }
 
-func (s *UserService) GetUserByIDWithCache(id int64) (*model.User, error) {
+func (s *UserService) GetUserByIDWithCache(id int64) (*userModel.User, error) {
 	return s.Repo.GetUserByIDWithCache(id)
 }
 
 // GetUserWithOrders returns user and their orders by userID
-func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, error) {
+func (s *UserService) GetUserWithOrders(userID int64) (*userModel.UserWithOrders, error) {
 	usr, err := s.Repo.GetUserByID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user failed: %w", err)
@@ -45,13 +57,13 @@ func (s *UserService) GetUserWithOrders(userID int64) (*model.UserWithOrders, er
 	if err != nil {
 		return nil, fmt.Errorf("get orders failed: %w", err)
 	}
-	return &model.UserWithOrders{
+	return &userModel.UserWithOrders{
 		User:   usr,
 		Orders: orders,
 	}, nil
 }
 
-func (s *UserService) RegisterUser(user *model.User) error {
+func (s *UserService) RegisterUser(user *userModel.User) error {
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -86,10 +98,29 @@ func (s *UserService) LoginUser(email, password string) (string, error) {
 	return tokenString, nil
 }
 
-func (s *UserService) UpdateUser(user *model.User) error {
+func (s *UserService) UpdateUser(user *userModel.User) error {
 	return s.Repo.UpdateUser(user)
 }
 
 func (s *UserService) DeleteUser(id int64) error {
 	return s.Repo.DeleteUser(id)
+}
+
+func (s *UserService) RegisterUserWithOrder(user *userModel.User, order *orderModel.Order) error {
+	uow, err := s.txManager.Begin()
+	if err != nil {
+		return err
+	}
+	defer uow.Rollback() // Rollback if any error occurs
+
+	if err := uow.UserRepo().CreateUser(user); err != nil {
+		return err
+	}
+
+	order.UserID = int64(user.ID)
+	if err := uow.OrderRepo().CreateOrder(order); err != nil {
+		return err
+	}
+
+	return uow.Commit() // Commit only if all succeed
 }
